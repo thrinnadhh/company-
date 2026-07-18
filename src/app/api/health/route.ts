@@ -4,7 +4,7 @@ export function GET() {
   return NextResponse.json({
     ok: true,
     app: "CompanyNow",
-    mode: "live-two-user-mvp",
+    mode: "production-two-user-pwa",
     timestamp: new Date().toISOString(),
   });
 }
