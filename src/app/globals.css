@@ -28,3 +28,22 @@ input[type="range"] { height: 18px; }
   .primary { @apply w-full rounded-2xl bg-emerald-300 px-4 py-3 font-bold text-emerald-950 disabled:opacity-40; }
   .secondary { @apply w-full rounded-2xl border border-white/10 px-4 py-3 font-semibold disabled:opacity-40; }
 }
+
+/* Leaflet map is loaded client-side from the pinned official 1.9.4 CDN build. */
+.leaflet-container { z-index: 0; background: #0b1714; font-family: inherit; }
+.leaflet-tile-pane { filter: brightness(.72) saturate(.62) contrast(1.12) hue-rotate(105deg); }
+.leaflet-control-attribution { background: rgba(7, 17, 15, .78) !important; color: rgba(255,255,255,.62) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: #a7f3d0 !important; }
+.leaflet-control-zoom a { border-color: rgba(255,255,255,.12) !important; background: rgba(7,17,15,.92) !important; color: #d1fae5 !important; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #07110f; color: #ecfdf5; }
+.leaflet-popup-content { margin: 12px 14px; line-height: 1.45; }
+.leaflet-popup-content span, .leaflet-popup-content small { color: rgba(236,253,245,.64); }
+.companynow-map-marker-shell, .companynow-self-marker-shell { border: 0 !important; background: transparent !important; }
+.companynow-map-pin { position: relative; width: 56px; height: 62px; transform-origin: center bottom; transition: transform .18s ease; }
+.companynow-map-pin:hover, .companynow-map-pin.is-selected { transform: translateY(-4px) scale(1.12); }
+.companynow-map-pin svg { display: block; width: 52px; height: 52px; border: 2px solid rgba(167,243,208,.72); border-radius: 17px; box-shadow: 0 8px 24px rgba(0,0,0,.38); }
+.companynow-map-pin.is-selected svg { border-color: #ecfdf5; box-shadow: 0 0 0 5px rgba(110,231,183,.24), 0 10px 26px rgba(0,0,0,.42); }
+.companynow-map-live-dot { position: absolute; right: 0; top: -2px; width: 14px; height: 14px; border: 3px solid #07110f; border-radius: 999px; background: #34d399; }
+.companynow-map-initial { position: absolute; left: 18px; bottom: 0; min-width: 22px; height: 22px; padding: 0 5px; border: 2px solid #07110f; border-radius: 999px; background: #ecfdf5; color: #064e3b; font-size: 11px; font-weight: 900; line-height: 18px; text-align: center; }
+.companynow-self-pin { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgba(255,255,255,.82); border-radius: 999px; background: rgba(110,231,183,.2); box-shadow: 0 0 0 8px rgba(110,231,183,.12); }
+.companynow-self-pin span { width: 10px; height: 10px; border-radius: 999px; background: #ecfdf5; box-shadow: 0 0 14px #6ee7b7; }
