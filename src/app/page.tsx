@@ -1,5 +1,5 @@
-import { CompanyNowApp } from "@/components/company-now-app";
+import { CompanyNowLive } from "@/components/company-now-live";
 
-export default function HomePage() {
-  return <CompanyNowApp />;
+export default function Home() {
+  return <CompanyNowLive />;
 }
