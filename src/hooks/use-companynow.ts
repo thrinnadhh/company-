@@ -260,7 +260,7 @@ export function useCompanyNow() {
     const result = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.href.split("#")[0].split("?")[0] },
     });
     if (result.error) {
       setError(result.error.message);
