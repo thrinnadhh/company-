@@ -3,123 +3,32 @@
 import {
   BadgeCheck,
   Home,
+  LoaderCircle,
   MapPin,
   MessageCircle,
   Power,
-  RotateCcw,
+  RefreshCw,
   Send,
   ShieldCheck,
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-type Tab = "nearby" | "requests" | "chat" | "profile";
-type RequestState = "idle" | "sent" | "accepted";
-type Person = {
-  id: string;
-  name: string;
-  initials: string;
-  distance: number;
-  distanceLabel: string;
-  languages: string;
-  status: string;
-};
-type Message = { id: number; sender: "me" | "them" | "system"; text: string };
-
-const PEOPLE: Person[] = [
-  {
-    id: "rahul",
-    name: "Rahul",
-    initials: "R",
-    distance: 240,
-    distanceLabel: "Around 200–500 m away",
-    languages: "Telugu · English",
-    status: "Walking in the park and open to talking.",
-  },
-  {
-    id: "meera",
-    name: "Meera",
-    initials: "M",
-    distance: 460,
-    distanceLabel: "Around 500 m away",
-    languages: "English · Hindi",
-    status: "Having coffee before heading home.",
-  },
-];
-
-const INITIAL_MESSAGES: Message[] = [
-  { id: 1, sender: "system", text: "You both accepted. Exact locations remain private." },
-  { id: 2, sender: "them", text: "Hi! Are you walking near the main track?" },
-];
-
-function radiusLabel(radius: number) {
-  return radius >= 1000 ? `${radius / 1000} km` : `${radius} m`;
-}
+import { useCompanyNow } from "@/hooks/use-companynow";
+import type { Connection } from "@/lib/companynow/types";
+import { radiusLabel } from "@/lib/companynow/types";
 
 export function CompanyNowApp() {
-  const [tab, setTab] = useState<Tab>("nearby");
-  const [visible, setVisible] = useState(false);
-  const [radius, setRadius] = useState(500);
-  const [status, setStatus] = useState("Walking in the park — open to company");
-  const [selected, setSelected] = useState<Person>(PEOPLE[0]);
-  const [request, setRequest] = useState<RequestState>("idle");
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-  const [draft, setDraft] = useState("");
-  const [meetingPoint, setMeetingPoint] = useState<string | null>(null);
-  const [notice, setNotice] = useState("Turn on Open to Connect to begin the judge demo.");
+  const app = useCompanyNow();
 
-  const nearby = useMemo(
-    () => (visible ? PEOPLE.filter((person) => person.distance <= radius) : []),
-    [visible, radius],
-  );
-
-  function toggleVisibility() {
-    const next = !visible;
-    setVisible(next);
-    setNotice(
-      next
-        ? `You are visible within ${radiusLabel(radius)}. Exact coordinates stay hidden.`
-        : "You are no longer visible nearby.",
-    );
+  if (app.bootState === "setup") return <SetupScreen />;
+  if (app.bootState === "loading") return <LoadingScreen label="Creating your private device identity…" />;
+  if (app.bootState === "error") return <ErrorScreen message={app.error ?? "Could not start CompanyNow."} />;
+  if (app.bootState === "onboarding") {
+    return <OnboardingScreen busy={app.busy} error={app.error} onSave={app.saveProfile} />;
   }
-
-  function sayHi(person: Person) {
-    setSelected(person);
-    setRequest("sent");
-    setTab("requests");
-    setNotice(`${person.name} received a private Say Hi request.`);
-  }
-
-  function accept() {
-    setRequest("accepted");
-    setTab("chat");
-    setNotice("Both people accepted. The coordination chat is open.");
-  }
-
-  function ignore() {
-    setRequest("idle");
-    setTab("nearby");
-    setNotice("The request was ignored privately. No rejection is shown.");
-  }
-
-  function sendMessage() {
-    const text = draft.trim();
-    if (!text) return;
-    setMessages((current) => [...current, { id: Date.now(), sender: "me", text }]);
-    setDraft("");
-  }
-
-  function reset() {
-    setTab("nearby");
-    setVisible(false);
-    setRadius(500);
-    setStatus("Walking in the park — open to company");
-    setRequest("idle");
-    setMessages(INITIAL_MESSAGES);
-    setMeetingPoint(null);
-    setNotice("Turn on Open to Connect to begin the judge demo.");
-  }
+  if (!app.profile || !app.userId) return <LoadingScreen label="Opening CompanyNow…" />;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#193d35_0,_#081613_42%,_#030807_100%)] text-white">
@@ -129,119 +38,200 @@ export function CompanyNowApp() {
             <p className="text-lg font-bold">CompanyNow</p>
             <p className="text-xs text-white/45">Someone nearby. A moment together.</p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs ${visible ? "bg-emerald-300/15 text-emerald-200" : "bg-white/5 text-white/45"}`}>
-            {visible ? "Visible now" : "Private"}
+          <span className={`rounded-full px-3 py-1 text-xs ${app.visible ? "bg-emerald-300/15 text-emerald-200" : "bg-white/5 text-white/45"}`}>
+            {app.visible ? "Visible now" : "Private"}
           </span>
         </header>
 
         <main className="space-y-4 px-4 pb-28 pt-4">
           <section className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-3 text-sm text-emerald-50">
             <div className="flex items-start justify-between gap-3">
-              <p>{notice}</p>
-              <button type="button" onClick={reset} aria-label="Reset demo" className="shrink-0 rounded-xl p-1 text-emerald-100/70 hover:bg-white/10">
-                <RotateCcw className="size-4" />
+              <p>{app.notice}</p>
+              <button
+                type="button"
+                onClick={() => void (app.visible ? app.loadNearby() : app.loadConnections())}
+                aria-label="Refresh"
+                className="shrink-0 rounded-xl p-1 text-emerald-100/70 hover:bg-white/10"
+              >
+                <RefreshCw className="size-4" />
               </button>
             </div>
           </section>
 
-          {tab === "nearby" && (
+          {app.error && <ErrorNotice message={app.error} onClose={() => app.setError(null)} />}
+
+          {app.tab === "nearby" && (
             <>
               <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <h1 className="font-semibold">Open to Connect</h1>
-                    <p className="mt-1 text-sm text-white/45">See and be seen only by nearby people who also opt in.</p>
+                    <p className="mt-1 text-sm text-white/45">Both people must switch this on before either appears nearby.</p>
                   </div>
-                  <button type="button" onClick={toggleVisibility} className={`grid size-14 place-items-center rounded-full transition ${visible ? "bg-emerald-300 text-emerald-950" : "bg-white/10 text-white/50"}`}>
-                    <Power className="size-6" />
+                  <button
+                    disabled={app.busy}
+                    type="button"
+                    onClick={() => void app.toggleVisibility()}
+                    className={`grid size-14 place-items-center rounded-full transition disabled:opacity-50 ${app.visible ? "bg-emerald-300 text-emerald-950" : "bg-white/10 text-white/50"}`}
+                  >
+                    {app.busy ? <LoaderCircle className="size-6 animate-spin" /> : <Power className="size-6" />}
                   </button>
                 </div>
 
-                <label className="mt-5 block text-sm font-medium" htmlFor="radius">Radius: {radiusLabel(radius)}</label>
-                <input id="radius" className="mt-2 w-full accent-emerald-300" type="range" min="100" max="2000" step="100" value={radius} onChange={(event) => setRadius(Number(event.target.value))} />
+                <label className="mt-5 block text-sm font-medium" htmlFor="radius">Radius: {radiusLabel(app.radius)}</label>
+                <input
+                  id="radius"
+                  className="mt-2 w-full accent-emerald-300"
+                  type="range"
+                  min="100"
+                  max="2000"
+                  step="100"
+                  value={app.radius}
+                  onChange={(event) => app.setRadius(Number(event.target.value))}
+                />
 
                 <label className="mt-4 block text-sm font-medium" htmlFor="status">Optional status</label>
-                <textarea id="status" value={status} onChange={(event) => setStatus(event.target.value)} maxLength={100} rows={2} className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-emerald-300/50" />
+                <textarea
+                  id="status"
+                  value={app.status}
+                  onChange={(event) => app.setStatus(event.target.value)}
+                  maxLength={100}
+                  rows={2}
+                  placeholder="Walking, coffee, metro, gym…"
+                  className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-emerald-300/50"
+                />
               </section>
 
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="font-semibold">Nearby now</h2>
-                  <span className="text-xs text-white/40">{nearby.length} active</span>
+                  <span className="text-xs text-white/40">{app.nearby.length} active</span>
                 </div>
-                {!visible && <Empty text="Turn on Open to Connect to view active people nearby." />}
-                {visible && nearby.length === 0 && <Empty text="No active people are currently inside this radius." />}
-                {nearby.map((person) => (
-                  <article key={person.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+                {!app.visible && <Empty text="Turn on Open to Connect to become visible and find other active people." />}
+                {app.visible && app.nearby.length === 0 && (
+                  <Empty text="No one active is inside both users’ selected radius yet. Open this app on a second phone nearby and switch it on." />
+                )}
+                {app.nearby.map((person) => (
+                  <article key={person.user_id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
                     <div className="flex gap-3">
-                      <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-300/15 font-bold text-emerald-200">{person.initials}</div>
+                      <Avatar name={person.display_name} />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 font-semibold">{person.name}<BadgeCheck className="size-4 text-emerald-300" /></div>
-                        <p className="text-xs text-white/40">{person.distanceLabel} · {person.languages}</p>
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          {person.display_name}<BadgeCheck className="size-4 text-emerald-300" />
+                        </div>
+                        <p className="text-xs text-white/40">
+                          {person.distance_label} · {person.languages.join(" · ") || "Language not added"}
+                        </p>
                       </div>
                     </div>
-                    <p className="mt-3 rounded-2xl bg-black/20 p-3 text-sm text-white/70">“{person.status}”</p>
-                    <button type="button" onClick={() => sayHi(person)} className="mt-3 w-full rounded-2xl bg-emerald-300 px-4 py-3 text-sm font-bold text-emerald-950">Say Hi</button>
+                    <p className="mt-3 rounded-2xl bg-black/20 p-3 text-sm text-white/70">“{person.status_text || "Open to conversation"}”</p>
+                    <button
+                      disabled={app.busy}
+                      type="button"
+                      onClick={() => void app.sendRequest(person)}
+                      className="mt-3 w-full rounded-2xl bg-emerald-300 px-4 py-3 text-sm font-bold text-emerald-950 disabled:opacity-50"
+                    >
+                      Say Hi
+                    </button>
                   </article>
                 ))}
               </section>
             </>
           )}
 
-          {tab === "requests" && (
-            request === "sent" ? (
-              <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-emerald-200">Receiver demo</p>
-                <h2 className="mt-2 text-xl font-semibold">Trinadh would like to say hi</h2>
-                <p className="mt-2 text-sm text-white/50">Nearby · {status || "Open to conversation"}</p>
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <button type="button" onClick={ignore} className="rounded-2xl border border-white/10 px-4 py-3 font-semibold">Ignore</button>
-                  <button type="button" onClick={accept} className="rounded-2xl bg-emerald-300 px-4 py-3 font-bold text-emerald-950">Accept</button>
-                </div>
-              </section>
-            ) : <Empty text="No pending requests. Send Say Hi from the Nearby screen." />
+          {app.tab === "requests" && (
+            <section className="space-y-4">
+              <RequestGroup title="Incoming" empty="No one has requested to connect yet.">
+                {app.incoming.map((connection) => (
+                  <article key={connection.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={connection.other?.display_name ?? "Nearby person"} />
+                      <div>
+                        <p className="font-semibold">{connection.other?.display_name ?? "Nearby person"}</p>
+                        <p className="text-xs text-white/40">Would like to say hi</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <button disabled={app.busy} type="button" onClick={() => void app.respond(connection, false)} className="rounded-2xl border border-white/10 px-4 py-3 font-semibold">Ignore</button>
+                      <button disabled={app.busy} type="button" onClick={() => void app.respond(connection, true)} className="rounded-2xl bg-emerald-300 px-4 py-3 font-bold text-emerald-950">Accept</button>
+                    </div>
+                  </article>
+                ))}
+              </RequestGroup>
+
+              <RequestGroup title="Waiting" empty="No outgoing requests.">
+                {app.outgoing.map((connection) => <ConnectionCard key={connection.id} connection={connection} actionLabel="Request sent" />)}
+              </RequestGroup>
+
+              <RequestGroup title="Connected" empty="Accepted connections appear here.">
+                {app.accepted.map((connection) => (
+                  <ConnectionCard key={connection.id} connection={connection} actionLabel="Open chat" onAction={() => void app.openChat(connection)} />
+                ))}
+              </RequestGroup>
+            </section>
           )}
 
-          {tab === "chat" && (
-            request === "accepted" ? (
+          {app.tab === "chat" && (
+            app.activeConnection ? (
               <section className="space-y-3">
                 <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                  <div className="flex items-center justify-between">
-                    <div><h2 className="font-semibold">Chat with {selected.name}</h2><p className="text-xs text-white/40">Connected · exact location hidden</p></div>
-                    <button type="button" onClick={() => { setRequest("idle"); setTab("nearby"); setMeetingPoint(null); }} className="rounded-xl border border-white/10 px-3 py-2 text-xs">Disconnect</button>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="font-semibold">Chat with {app.activeConnection.other?.display_name ?? "your connection"}</h2>
+                      <p className="text-xs text-white/40">Realtime chat · exact location hidden</p>
+                    </div>
+                    <button type="button" onClick={() => void app.disconnect()} className="rounded-xl border border-white/10 px-3 py-2 text-xs">Disconnect</button>
                   </div>
-                  <div className="mt-4 space-y-2">
-                    {messages.map((message) => (
-                      <div key={message.id} className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm ${message.sender === "me" ? "ml-auto bg-emerald-300 text-emerald-950" : message.sender === "system" ? "mx-auto bg-white/5 text-center text-xs text-white/45" : "bg-white/10"}`}>{message.text}</div>
+                  <div className="mt-4 min-h-52 space-y-2">
+                    {app.messages.length === 0 && <p className="py-8 text-center text-sm text-white/35">Say hello and decide whether to chat or meet.</p>}
+                    {app.messages.map((message) => (
+                      <div key={message.id} className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm ${message.sender_id === app.userId ? "ml-auto bg-emerald-300 text-emerald-950" : "bg-white/10"}`}>
+                        {message.body}
+                      </div>
                     ))}
                   </div>
                   <div className="mt-4 flex gap-2">
-                    <input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") sendMessage(); }} placeholder="Type a message" className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none" />
-                    <button type="button" onClick={sendMessage} className="grid size-11 place-items-center rounded-2xl bg-emerald-300 text-emerald-950"><Send className="size-4" /></button>
+                    <input
+                      value={app.draft}
+                      onChange={(event) => app.setDraft(event.target.value)}
+                      onKeyDown={(event) => { if (event.key === "Enter") void app.sendMessage(); }}
+                      placeholder="Type a message"
+                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none"
+                    />
+                    <button type="button" onClick={() => void app.sendMessage()} className="grid size-11 place-items-center rounded-2xl bg-emerald-300 text-emerald-950"><Send className="size-4" /></button>
                   </div>
                 </div>
+
                 <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
                   <h3 className="flex items-center gap-2 font-semibold"><MapPin className="size-4 text-emerald-300" /> Meet safely</h3>
-                  <p className="mt-1 text-sm text-white/45">Suggest a public reference point. Both people still decide whether to meet.</p>
+                  <p className="mt-1 text-sm text-white/45">Send a public reference point. Never share a home address.</p>
                   <div className="mt-3 grid gap-2">
-                    {["Main park entrance", "Coffee counter", "Security desk"].map((point) => (
-                      <button key={point} type="button" onClick={() => setMeetingPoint(point)} className={`rounded-2xl border px-3 py-2 text-left text-sm ${meetingPoint === point ? "border-emerald-300/50 bg-emerald-300/10" : "border-white/10"}`}>{point}</button>
+                    {["📍 Main entrance", "📍 Coffee counter", "📍 Security desk"].map((point) => (
+                      <button key={point} type="button" onClick={() => void app.sendMessage(`Meet suggestion: ${point}`)} className="rounded-2xl border border-white/10 px-3 py-2 text-left text-sm">{point}</button>
                     ))}
                   </div>
                 </section>
               </section>
-            ) : <Empty text="Chat opens only after the Say Hi request is accepted." />
+            ) : (
+              <section className="space-y-3">
+                <Empty text="Accept a request or open one of your connected conversations." />
+                {app.accepted.map((connection) => (
+                  <ConnectionCard key={connection.id} connection={connection} actionLabel="Open chat" onAction={() => void app.openChat(connection)} />
+                ))}
+              </section>
+            )
           )}
 
-          {tab === "profile" && (
+          {app.tab === "profile" && (
             <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-              <div className="grid size-16 place-items-center rounded-3xl bg-emerald-300/15 text-xl font-bold text-emerald-200">T</div>
-              <h2 className="mt-3 text-xl font-semibold">Trinadh</h2>
-              <p className="text-sm text-white/45">Telugu · English · Phone verified</p>
+              <Avatar name={app.profile.display_name} large />
+              <h2 className="mt-3 text-xl font-semibold">{app.profile.display_name}</h2>
+              <p className="text-sm text-white/45">{app.profile.languages.join(" · ") || "No languages added"} · 18+ confirmed</p>
               <div className="mt-5 space-y-3 text-sm text-white/65">
-                <p className="flex gap-2"><ShieldCheck className="size-5 text-emerald-300" /> Exact coordinates are never shown to other users.</p>
-                <p className="flex gap-2"><UsersRound className="size-5 text-emerald-300" /> CompanyNow is for temporary, mutual company—not dating.</p>
+                <p className="flex gap-2"><ShieldCheck className="size-5 shrink-0 text-emerald-300" /> Exact coordinates never leave the protected matching function.</p>
+                <p className="flex gap-2"><UsersRound className="size-5 shrink-0 text-emerald-300" /> Both people must be active and inside each other’s selected radius.</p>
               </div>
+              <button type="button" onClick={() => void app.resetDeviceIdentity()} className="mt-6 w-full rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold">Reset this test identity</button>
             </section>
           )}
         </main>
@@ -249,11 +239,11 @@ export function CompanyNowApp() {
         <nav className="fixed inset-x-0 bottom-0 mx-auto grid max-w-md grid-cols-4 border-x border-t border-white/10 bg-[#07110f]/95 px-2 pb-3 pt-2 backdrop-blur-xl">
           {([
             ["nearby", "Nearby", Home],
-            ["requests", "Requests", UsersRound],
+            ["requests", `Requests${app.incoming.length ? ` ${app.incoming.length}` : ""}`, UsersRound],
             ["chat", "Chat", MessageCircle],
             ["profile", "Profile", UserRound],
           ] as const).map(([id, label, Icon]) => (
-            <button key={id} type="button" onClick={() => setTab(id)} className={`flex flex-col items-center gap-1 rounded-2xl py-2 text-xs ${tab === id ? "text-emerald-200" : "text-white/35"}`}>
+            <button key={id} type="button" onClick={() => app.setTab(id)} className={`flex flex-col items-center gap-1 rounded-2xl py-2 text-xs ${app.tab === id ? "text-emerald-200" : "text-white/35"}`}>
               <Icon className="size-5" />{label}
             </button>
           ))}
@@ -263,6 +253,68 @@ export function CompanyNowApp() {
   );
 }
 
+function OnboardingScreen({ busy, error, onSave }: { busy: boolean; error: string | null; onSave: (name: string, languages: string) => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [languages, setLanguages] = useState("Telugu, English");
+  const [adult, setAdult] = useState(false);
+  const valid = name.trim().length >= 2 && adult;
+
+  return (
+    <Shell>
+      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <p className="text-sm text-emerald-200">First launch</p>
+        <h1 className="mt-1 text-2xl font-bold">Create your nearby profile</h1>
+        <p className="mt-2 text-sm text-white/45">Only your first name, languages and optional status are shown.</p>
+        {error && <div className="mt-4"><ErrorNotice message={error} /></div>}
+        <label className="mt-5 block text-sm font-medium" htmlFor="name">First name</label>
+        <input id="name" value={name} onChange={(event) => setName(event.target.value)} maxLength={40} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none" placeholder="Trinadh" />
+        <label className="mt-4 block text-sm font-medium" htmlFor="languages">Languages, separated by commas</label>
+        <input id="languages" value={languages} onChange={(event) => setLanguages(event.target.value)} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none" />
+        <label className="mt-5 flex items-start gap-3 text-sm text-white/70">
+          <input type="checkbox" checked={adult} onChange={(event) => setAdult(event.target.checked)} className="mt-1 accent-emerald-300" />
+          <span>I confirm that I am at least 18 years old.</span>
+        </label>
+        <button disabled={!valid || busy} type="button" onClick={() => void onSave(name, languages)} className="mt-5 w-full rounded-2xl bg-emerald-300 px-4 py-3 font-bold text-emerald-950 disabled:opacity-40">
+          {busy ? "Creating…" : "Enter CompanyNow"}
+        </button>
+      </section>
+    </Shell>
+  );
+}
+
+function SetupScreen() {
+  return <Shell><section className="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5"><h1 className="text-xl font-bold">Backend configuration required</h1><p className="mt-2 text-sm text-white/60">Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then apply the included Supabase migration.</p></section></Shell>;
+}
+
+function LoadingScreen({ label }: { label: string }) {
+  return <Shell><div className="flex items-center justify-center gap-3 py-20 text-white/60"><LoaderCircle className="size-5 animate-spin" />{label}</div></Shell>;
+}
+
+function ErrorScreen({ message }: { message: string }) {
+  return <Shell><ErrorNotice message={message} /></Shell>;
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#193d35_0,_#081613_42%,_#030807_100%)] px-4 py-8 text-white"><div className="mx-auto max-w-md"><header className="mb-6"><p className="text-2xl font-bold">CompanyNow</p><p className="text-sm text-white/45">Someone nearby. A moment together.</p></header>{children}</div></div>;
+}
+
+function ErrorNotice({ message, onClose }: { message: string; onClose?: () => void }) {
+  return <div className="flex items-start justify-between gap-3 rounded-2xl border border-red-300/20 bg-red-300/10 p-3 text-sm text-red-100"><p>{message}</p>{onClose && <button type="button" onClick={onClose} aria-label="Dismiss">×</button>}</div>;
+}
+
+function RequestGroup({ title, empty, children }: { title: string; empty: string; children: React.ReactNode }) {
+  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  return <div className="space-y-3"><h2 className="font-semibold">{title}</h2>{hasChildren ? children : <Empty text={empty} />}</div>;
+}
+
+function ConnectionCard({ connection, actionLabel, onAction }: { connection: Connection; actionLabel: string; onAction?: () => void }) {
+  return <article className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-4"><Avatar name={connection.other?.display_name ?? "Nearby person"} /><div className="min-w-0 flex-1"><p className="font-semibold">{connection.other?.display_name ?? "Nearby person"}</p><p className="text-xs text-white/40">{connection.state === "accepted" ? "Connected" : "Waiting for a response"}</p></div><button type="button" disabled={!onAction} onClick={onAction} className={`rounded-xl px-3 py-2 text-xs font-semibold ${onAction ? "bg-emerald-300 text-emerald-950" : "bg-white/5 text-white/35"}`}>{actionLabel}</button></article>;
+}
+
+function Avatar({ name, large = false }: { name: string; large?: boolean }) {
+  return <div className={`grid shrink-0 place-items-center bg-emerald-300/15 font-bold text-emerald-200 ${large ? "size-16 rounded-3xl text-xl" : "size-12 rounded-2xl"}`}>{name.trim().charAt(0).toUpperCase() || "?"}</div>;
+}
+
 function Empty({ text }: { text: string }) {
-  return <div className="rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-white/40">{text}</div>;
+  return <div className="rounded-3xl border border-dashed border-white/10 p-7 text-center text-sm text-white/40">{text}</div>;
 }
