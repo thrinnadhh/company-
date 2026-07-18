@@ -1,5 +1,5 @@
 export type Tab = "nearby" | "requests" | "chat" | "profile";
-export type BootState = "loading" | "setup" | "onboarding" | "ready" | "error";
+export type BootState = "loading" | "setup" | "auth" | "confirm" | "onboarding" | "ready" | "error";
 
 export type Profile = {
   id: string;
