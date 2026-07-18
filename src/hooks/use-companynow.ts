@@ -74,13 +74,11 @@ export function useCompanyNow() {
     async function bootstrap() {
       try {
         const { data } = await client.auth.getSession();
-        let id = data.session?.user.id ?? null;
+        const id = data.session?.user.id ?? null;
         if (!id) {
-          const { data: anonymousData, error: authError } = await client.auth.signInAnonymously();
-          if (authError) throw authError;
-          id = anonymousData.user?.id ?? null;
+          setBootState("auth");
+          return;
         }
-        if (!id) throw new Error("Could not create a device identity.");
         if (cancelled) return;
         setUserId(id);
         await loadProfile(id);
@@ -217,6 +215,37 @@ export function useCompanyNow() {
     return () => window.clearTimeout(timer);
   }, [bootState, loadNearby, radius, status, visible, writePresence]);
 
+  async function signUp(email: string, password: string) {
+    if (!supabase) return;
+    setBusy(true);
+    setError(null);
+    const result = await supabase.auth.signUp({ email, password });
+    if (result.error) {
+      setError(result.error.message);
+    } else if (result.data.session?.user) {
+      setUserId(result.data.session.user.id);
+      await loadProfile(result.data.session.user.id);
+    } else {
+      setNotice("Check your email, confirm your account, then return here to sign in.");
+      setBootState("confirm");
+    }
+    setBusy(false);
+  }
+
+  async function signIn(email: string, password: string) {
+    if (!supabase) return;
+    setBusy(true);
+    setError(null);
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    if (result.error) {
+      setError(result.error.message);
+    } else if (result.data.user) {
+      setUserId(result.data.user.id);
+      await loadProfile(result.data.user.id);
+    }
+    setBusy(false);
+  }
+
   async function saveProfile(name: string, languageText: string) {
     if (!supabase || !userId) return;
     setBusy(true);
@@ -324,7 +353,14 @@ export function useCompanyNow() {
     if (!supabase) return;
     if (visible) await writePresence(false).catch(() => undefined);
     await supabase.auth.signOut();
-    window.location.reload();
+    setUserId(null);
+    setProfile(null);
+    setVisible(false);
+    setNearby([]);
+    setConnections([]);
+    setActiveConnection(null);
+    setMessages([]);
+    setBootState("auth");
   }
 
   const incoming = connections.filter((item) => item.state === "pending" && item.recipient_id === userId);
@@ -335,7 +371,7 @@ export function useCompanyNow() {
     bootState, userId, profile, tab, visible, radius, status, nearby, activeConnection,
     messages, draft, busy, notice, error, incoming, outgoing, accepted,
     setTab, setRadius, setStatus, setDraft, setError,
-    loadNearby, loadConnections, saveProfile, toggleVisibility, sendRequest,
+    loadNearby, loadConnections, signUp, signIn, saveProfile, toggleVisibility, sendRequest,
     respond, openChat, sendMessage, disconnect, resetDeviceIdentity,
   };
 }
