@@ -45,6 +45,8 @@ Apply migrations in order:
 supabase/migrations/0001_companynow_mvp.sql
 supabase/migrations/0002_production_hardening.sql
 supabase/migrations/0003_companynow_multi_user_mvp.sql
+supabase/migrations/0004_reduce_privileged_rpc_surface.sql
+supabase/migrations/0005_consolidate_profile_select_policy.sql
 ```
 
 The active CompanyNow Supabase project is hosted in `ap-south-1` (Mumbai).
