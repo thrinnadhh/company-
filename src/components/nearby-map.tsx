@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { Coordinates, NearbyPerson } from "@/lib/companynow/types";
+import type { NearbyPerson } from "@/lib/companynow/types";
+
+type Coordinates = { latitude: number; longitude: number };
+type MapNearbyPerson = NearbyPerson & { approximate_latitude: number; approximate_longitude: number };
 
 type LeafletLayerTarget = LeafletMap | LeafletLayerGroup;
 type LeafletMap = {
@@ -120,22 +123,44 @@ function selfMarkerHtml() {
 }
 
 export function NearbyMap({
-  center,
+  active,
   people,
   radius,
   selectedUserId,
   onSelect,
 }: {
-  center: Coordinates | null;
+  active: boolean;
   people: NearbyPerson[];
   radius: number;
   selectedUserId: string | null;
   onSelect: (person: NearbyPerson) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [center, setCenter] = useState<Coordinates | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const overlayRef = useRef<LeafletLayerGroup | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      const timer = window.setTimeout(() => {
+        mapRef.current?.remove();
+        mapRef.current = null;
+        overlayRef.current = null;
+        setCenter(null);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    if (!navigator.geolocation) {
+      const timer = window.setTimeout(() => setLoadError("Location is not supported on this device."), 0);
+      return () => window.clearTimeout(timer);
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setCenter({ latitude: coords.latitude, longitude: coords.longitude }),
+      () => setLoadError("Allow location access to open the nearby map."),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 },
+    );
+  }, [active]);
 
   useEffect(() => () => {
     mapRef.current?.remove();
@@ -193,7 +218,9 @@ export function NearbyMap({
 
         const bounds: [number, number][] = [selfPoint];
         for (const person of people) {
-          const point: [number, number] = [person.approximate_latitude, person.approximate_longitude];
+          const mappedPerson = person as MapNearbyPerson;
+          if (!Number.isFinite(mappedPerson.approximate_latitude) || !Number.isFinite(mappedPerson.approximate_longitude)) continue;
+          const point: [number, number] = [mappedPerson.approximate_latitude, mappedPerson.approximate_longitude];
           bounds.push(point);
           const selected = person.user_id === selectedUserId;
           leaflet.marker(point, {
@@ -229,7 +256,7 @@ export function NearbyMap({
     return () => { active = false; };
   }, [center, onSelect, people, radius, selectedUserId]);
 
-  if (!center) {
+  if (!active || !center) {
     return <div className="grid min-h-80 place-items-center rounded-[2rem] border border-dashed border-white/15 bg-black/20 px-8 text-center"><div><p className="font-semibold">Your nearby map will appear here</p><p className="mt-2 text-sm text-white/45">Turn on Open to Connect and allow location access.</p></div></div>;
   }
 
